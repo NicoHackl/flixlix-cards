@@ -13,9 +13,12 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Source
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Use PAT to ensure the push triggers follow-up actions if needed
+          token: ${{ secrets.DIST_REPO_TOKEN }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -29,7 +32,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Create Release PR or Tag
+      - name: Versioning (Changesets)
         id: changesets
         uses: changesets/action@v1
         with:
@@ -37,55 +40,80 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sync to Distribution Repos
-        if: steps.changesets.outputs.published == 'true'
+      - name: Sync Distribution Repositories
+        # Only run if we are NOT in a PR phase (no changesets left)
+        if: steps.changesets.outputs.hasChangesets == 'false'
         env:
           DIST_REPO_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
           GH_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
         run: |
-          # Loop through each package that was just tagged by changesets
-          echo '${{ steps.changesets.outputs.publishedPackages }}' | jq -c '.[]' | while read -r pkg; do
-            NAME=$(echo $pkg | jq -r '.name')
-            VERSION=$(echo $pkg | jq -r '.version')
-            
-            # Remove scope if exists (e.g. @flixlix/power-flow-card-plus -> power-flow-card-plus)
-            CLEAN_NAME=$(echo $NAME | sed 's|^@.*/||')
-            
-            echo "🚀 Syncing $CLEAN_NAME v$VERSION to its own repository..."
+          # 1. Identify what was tagged in this specific commit
+          # Changesets created these tags in the previous step
+          NEW_TAGS=$(git tag --points-at HEAD)
+          
+          if [ -z "$NEW_TAGS" ]; then
+            echo "ℹ️ No new package tags detected. Nothing to sync."
+            exit 0
+          fi
 
-            # 1. Build the package
-            pnpm --filter "$NAME" build
+          echo "✅ Found tags to sync: $NEW_TAGS"
 
-            # 2. Clone the destination repo
-            # We clone into a temporary folder 'dist-repo'
+          for TAG in $NEW_TAGS; do
+            # Expected format: @scope/package-name@version OR package-name@version
+            if [[ "$TAG" != *"@"* ]]; then continue; fi
+            
+            # Extract Name and Version
+            # This handles both scoped (@flixlix/card) and unscoped (card) names
+            VERSION=$(echo $TAG | grep -oE '[0-9]+\.[0-9]+\.[0-9]+.*$')
+            FULL_NAME=${TAG%@$VERSION}
+            CLEAN_NAME=$(echo $FULL_NAME | sed 's|^@.*/||')
+            
+            # 2. Path Validation
+            # IMPORTANT: Matches your nested structure: packages/flixlix-cards/[name]
+            PKG_PATH="packages/flixlix-cards/${CLEAN_NAME}"
+            
+            if [ ! -d "$PKG_PATH" ]; then
+              echo "⚠️ Warning: Folder $PKG_PATH not found. Skipping $CLEAN_NAME."
+              continue
+            fi
+
+            echo "🛠 Processing $CLEAN_NAME (v$VERSION)..."
+
+            # 3. Build the specific package
+            pnpm --filter "$FULL_NAME" build
+
+            # 4. Prepare Distribution Repository
+            echo "📦 Syncing to flixlix/${CLEAN_NAME}..."
+            rm -rf dist-repo
             git clone "https://x-access-token:${DIST_REPO_TOKEN}@github.com/flixlix/${CLEAN_NAME}.git" dist-repo
             
-            # 3. Copy files (assuming your build output is in packages/[name]/dist/)
-            # We copy the JS file, the hacs.json, and the package-specific README
-            cp "packages/flixlix-cards/${CLEAN_NAME}/dist/${CLEAN_NAME}.js" dist-repo/
-            cp "packages/flixlix-cards/${CLEAN_NAME}/hacs.json" dist-repo/
-            cp "packages/flixlix-cards/${CLEAN_NAME}/README.md" dist-repo/
+            # 5. Atomic File Sync
+            # We copy only necessary files. If build output name differs, adjust here.
+            cp "${PKG_PATH}/dist/${CLEAN_NAME}.js" dist-repo/ || echo "❌ Build artifact not found!"
+            cp "${PKG_PATH}/hacs.json" dist-repo/
+            cp "${PKG_PATH}/README.md" dist-repo/
+            cp "${PKG_PATH}/CHANGELOG.md" dist-repo/ || true
 
-            # 4. Push to the card's dedicated repo
+            # 6. Push Changes & Release
             cd dist-repo
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add .
             
-            # Only commit/tag if there are actually changes
+            # Only proceed if files actually changed
             if ! git diff-index --quiet HEAD; then
               git commit -m "Release v${VERSION}"
               git tag -a "v${VERSION}" -m "Release v${VERSION}"
-              git push origin main --tags
+              git push origin main --tags --force
               
-              # 5. Create a GitHub Release in the dedicated repo
-              # This attaches the .js file to the release for HACS users
+              # Create GitHub Release with the JS asset attached
               gh release create "v${VERSION}" "${CLEAN_NAME}.js" \
                 --repo "flixlix/${CLEAN_NAME}" \
                 --title "v${VERSION}" \
-                --notes "For a full changelog, please see the [Monorepo](https://github.com/flixlix/flow-cards)."
+                --notes "Automated release from monorepo. See [flixlix-cards](https://github.com/flixlix/flixlix-cards) for full source."
+              echo "🚀 Successfully released $CLEAN_NAME v$VERSION"
             else
-              echo "No changes detected for $CLEAN_NAME. Skipping push."
+              echo "idempotent: No changes detected for $CLEAN_NAME. Repo is already up to date."
             fi
             
             cd ..

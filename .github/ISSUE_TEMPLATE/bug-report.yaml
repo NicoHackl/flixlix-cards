@@ -1,0 +1,46 @@
+name: 🐛 Bug Report
+description: Report a bug for one of the cards
+body:
+  - type: checkboxes
+    id: troubleshooting
+    attributes:
+      label: Troubleshooting
+      options:
+        - label: I have searched the existing issues to make sure this is not a duplicate.
+          required: true
+        - label: I am running the latest version of the card.
+          required: true
+        - label: I have cleared my browser cache and verified the issue persists in an Incognito/Private window.
+          required: true
+        - label: I have checked the browser console for JavaScript errors.
+          required: true
+  - type: input
+    id: ha-version
+    attributes:
+      label: Home Assistant Version
+      placeholder: e.g. 2026.4.1
+    validations:
+      required: true
+  - type: dropdown
+    id: package
+    attributes:
+      label: Which card is this for?
+      options:
+        - Power Flow Card Plus
+        - Energy Flow Card Plus
+        - Energy Period Selector Plus
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      placeholder: Describe the bug here...
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Card Configuration
+      description: Please paste your YAML configuration here.
+      render: yaml

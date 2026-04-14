@@ -1,4 +1,4 @@
-import localize from "@/localize/localize";
+import localize from "@flixlix-cards/shared/i18n";
 import { actionSchema, getBaseMainConfigSchema, secondaryInfoSchema } from "./_schema-base";
 
 const mainSchema = {
@@ -18,13 +18,14 @@ const mainSchema = {
     {
       name: "display_zero",
       label: "Display Zero",
-      default: true,
       selector: { boolean: {} },
+      default: true,
     },
     {
       name: "display_zero_state",
       label: "Display State When Zero?",
       selector: { boolean: {} },
+      default: true,
     },
     {
       name: "display_zero_tolerance",

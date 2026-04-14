@@ -44,6 +44,7 @@ export const cardConfigStruct = assign(
     style_ha_card: optional(any()),
     style_card_content: optional(any()),
     disable_dots: optional(boolean()),
+    no_labels: optional(boolean()),
     entities: object({
       battery: optional(any()),
       grid: optional(any()),
@@ -149,12 +150,12 @@ export const advancedOptionsSchema = memoizeOne((localize, displayZeroLinesMode:
       },
       {
         name: "w_decimals",
-        label: "Watt Decimals",
+        label: "Wh Decimals",
         selector: { number: { mode: "box", min: 0, max: 5, step: 1 } },
       },
       {
         name: "kw_decimals",
-        label: "kW Decimals",
+        label: "kWh Decimals",
         selector: { number: { mode: "box", min: 0, max: 5, step: 1 } },
       },
       {
@@ -168,18 +169,8 @@ export const advancedOptionsSchema = memoizeOne((localize, displayZeroLinesMode:
         selector: { number: { mode: "box", min: 0, max: 1000000, step: 0.01 } },
       },
       {
-        name: "max_expected_power",
-        label: "Max Expected Power (in Watts)",
-        selector: { number: { mode: "box", min: 0, max: 1000000, step: 0.01 } },
-      },
-      {
-        name: "min_expected_power",
-        label: "Min Expected Power (in Watts)",
-        selector: { number: { mode: "box", min: 0, max: 1000000, step: 0.01 } },
-      },
-      {
         name: "watt_threshold",
-        label: "Watt to Kilowatt Threshold",
+        label: "Wh to kWh Threshold",
         selector: { number: { mode: "box", min: 0, max: 1000000, step: 1 } },
       },
 
@@ -187,6 +178,7 @@ export const advancedOptionsSchema = memoizeOne((localize, displayZeroLinesMode:
         name: "clickable_entities",
         label: "Clickable Entities",
         selector: { boolean: {} },
+        default: true,
       },
       {
         name: "disable_dots",
@@ -194,14 +186,15 @@ export const advancedOptionsSchema = memoizeOne((localize, displayZeroLinesMode:
         selector: { boolean: {} },
       },
       {
-        name: "use_new_flow_rate_model",
-        label: "New Flow Model?",
+        name: "no_labels",
+        label: localize("editor.no_labels"),
         selector: { boolean: {} },
       },
       {
         name: "sort_individual_devices",
         label: "Sort individual devices by usage",
         selector: { boolean: {} },
+        default: true,
       },
       {
         name: "allow_layout_break",

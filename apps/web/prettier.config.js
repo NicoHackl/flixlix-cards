@@ -1,10 +1,8 @@
-//  @ts-check
+import litConfig from '@flixlix-cards/prettier-config/react'
 
-/** @type {import('prettier').Config} */
-const config = {
-  semi: false,
-  singleQuote: true,
-  trailingComma: 'all',
-}
+/**
+ * @type {import("prettier").Config}
+ */
+const prettierConfig = litConfig
 
-export default config
+export default prettierConfig

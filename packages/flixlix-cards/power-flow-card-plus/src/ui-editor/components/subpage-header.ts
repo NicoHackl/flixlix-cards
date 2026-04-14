@@ -1,5 +1,5 @@
 import { type PowerFlowCardPlusConfig } from "@/power-flow-card-plus-config";
-import localize from "@flixlix-cards/i18n";
+import localize from "@flixlix-cards/shared/i18n";
 import { mdiArrowLeft } from "@mdi/js";
 import { fireEvent, type HomeAssistant } from "custom-card-helpers";
 import { css, type CSSResultGroup, html, LitElement, type TemplateResult } from "lit";

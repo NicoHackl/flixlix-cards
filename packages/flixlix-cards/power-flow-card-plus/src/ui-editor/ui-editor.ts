@@ -1,5 +1,5 @@
 import { type PowerFlowCardPlusConfig } from "@/power-flow-card-plus-config";
-import localize from "@flixlix-cards/i18n";
+import localize from "@flixlix-cards/shared/i18n";
 import { fireEvent, type HomeAssistant, type LovelaceCardEditor } from "custom-card-helpers";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";

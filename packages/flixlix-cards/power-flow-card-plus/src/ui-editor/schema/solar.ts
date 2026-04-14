@@ -9,13 +9,11 @@ const mainSchema = {
       name: "color_value",
       label: "Color Value",
       selector: { boolean: {} },
-      default: true,
     },
     {
       name: "color_icon",
       label: "Color Icon",
       selector: { boolean: {} },
-      default: true,
     },
     {
       name: "display_zero",

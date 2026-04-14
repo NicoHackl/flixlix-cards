@@ -29,29 +29,32 @@ export const displayValue = (
   }
 ): string => {
   const whiteSpace = unitWhiteSpace === false ? "" : " ";
+  const isEnergyCard = (config?.type ?? "").includes("energy-flow-card-plus");
+  const baseUnit = isEnergyCard ? "Wh" : "W";
+  const kiloUnit = isEnergyCard ? "kWh" : "kW";
 
   if (value === null || value === undefined || value === "") {
-    return `0${whiteSpace}${unit ?? "W"}`;
+    return `0${whiteSpace}${unit ?? baseUnit}`;
   }
 
   if (!isNumberValue(value)) return value.toString();
 
   const valueInNumber = Number(value);
 
-  const isKW = unit === undefined && valueInNumber >= watt_threshold;
+  const isKilo = unit === undefined && valueInNumber >= watt_threshold;
 
-  const decimalsToRound = decimals ?? (isKW ? config.kw_decimals : config.w_decimals);
+  const decimalsToRound = decimals ?? (isKilo ? config.kw_decimals : config.w_decimals);
 
   const transformValue = (v: number) => (!accept_negative ? Math.abs(v) : v);
 
   const v = formatNumber(
     transformValue(
-      isKW
+      isKilo
         ? round(valueInNumber / 1000, decimalsToRound ?? 2)
         : round(valueInNumber, decimalsToRound ?? 0)
     ),
     hass.locale
   );
 
-  return `${v}${whiteSpace}${unit || (isKW ? "kW" : "W")}`;
+  return `${v}${whiteSpace}${unit || (isKilo ? kiloUnit : baseUnit)}`;
 };

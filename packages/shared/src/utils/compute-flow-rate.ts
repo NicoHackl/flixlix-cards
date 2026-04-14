@@ -22,7 +22,9 @@ const newFlowRate = (config: PowerFlowCardPlusConfig, value: number): number => 
 const oldFlowRate = (config: PowerFlowCardPlusConfig, value: number, total: number): number => {
   const min = config.min_flow_rate;
   const max = config.max_flow_rate;
-  return max - (value / (total > 0 ? total : value)) * (max - min);
+  const denominator = total > 0 ? total : value > 0 ? value : 1;
+  const ratio = value / denominator;
+  return max - ratio * (max - min);
 };
 
 export const computeFlowRate = (
@@ -31,8 +33,13 @@ export const computeFlowRate = (
   total: number
 ): number => {
   const isNewFlowRateModel = config.use_new_flow_rate_model ?? true;
-  if (isNewFlowRateModel) return newFlowRate(config, value);
-  return oldFlowRate(config, value, total);
+  const result = isNewFlowRateModel
+    ? newFlowRate(config, value)
+    : oldFlowRate(config, value, total);
+  if (!Number.isFinite(result)) {
+    return config.max_flow_rate;
+  }
+  return result;
 };
 
 export const computeIndividualFlowRate = (entry?: boolean | number, value?: number): number => {

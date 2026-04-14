@@ -47,7 +47,6 @@ jobs:
         run: |
           git push origin --tags
 
-          # Find ALL packages (both cards and tooling)
           for PKG_JSON in packages/**/package.json; do
             PKG_DIR=$(dirname "$PKG_JSON")
             NAME=$(jq -r '.name' "$PKG_JSON")
@@ -55,14 +54,11 @@ jobs:
             CLEAN_NAME=$(echo $NAME | sed 's|^@.*/||')
             MONO_TAG="${NAME}@${VERSION}"
 
-            # 1. Create Monorepo Release for EVERYTHING that was updated
-            # Check if this specific tag was just created in this commit
             TAG_IN_COMMIT=$(git tag --points-at HEAD | grep -x "$MONO_TAG" || true)
             
             if [ -n "$TAG_IN_COMMIT" ]; then
               echo "🚀 Creating Monorepo release for $MONO_TAG"
               
-              # Extract notes
               CHANGELOG_PATH="${PKG_DIR}/CHANGELOG.md"
               NOTES="New release."
               if [ -f "$CHANGELOG_PATH" ]; then
@@ -70,9 +66,15 @@ jobs:
                 if [ ${#NOTES} -lt 10 ]; then NOTES="Release v${VERSION}"; fi
               fi
 
-              gh release create "$MONO_TAG" --title "$MONO_TAG" --notes "$NOTES" || true
+              # Determine if this is a prerelease
+              PRERELEASE_FLAG=""
+              if [[ "$VERSION" == *"-"* ]]; then
+                PRERELEASE_FLAG="--prerelease"
+                echo "📦 Detected prerelease version: $VERSION"
+              fi
 
-              # 2. ONLY if the package is a CARD, sync it to its dedicated repo
+              gh release create "$MONO_TAG" --title "$MONO_TAG" --notes "$NOTES" $PRERELEASE_FLAG || true
+
               if [[ "$PKG_DIR" == *"packages/flixlix-cards/"* ]]; then
                 echo "📦 Syncing Card: $CLEAN_NAME to distribution repo..."
                 
@@ -94,7 +96,7 @@ jobs:
                   git commit -m "Release v${VERSION}"
                   git tag -a "v${VERSION}" -m "Release v${VERSION}"
                   git push origin main --tags --force
-                  gh release create "v${VERSION}" "${CLEAN_NAME}.js" --repo "flixlix/${CLEAN_NAME}" --title "v${VERSION}" --notes "$NOTES"
+                  gh release create "v${VERSION}" "${CLEAN_NAME}.js" --repo "flixlix/${CLEAN_NAME}" --title "v${VERSION}" --notes "$NOTES" $PRERELEASE_FLAG
                 fi
                 cd ..
                 rm -rf dist-repo

@@ -17,9 +17,12 @@ export const displayNonFossilState = (
   totalFromGrid: number,
   fossilEnergyConsumption?: FossilEnergyConsumption
 ): string | number => {
+  const cardType = config.type ?? "";
+  const isEnergyCard = cardType.includes("energy-flow-card-plus");
+  const unit = isEnergyCard ? "Wh" : "W";
   const unitWhiteSpace = config.entities.fossil_fuel_percentage?.unit_white_space ?? true;
-  const unitOfMeasurement: "W" | "%" =
-    config.entities.fossil_fuel_percentage?.state_type === "percentage" ? "%" : "W";
+  const unitOfMeasurement: "W" | "Wh" | "%" =
+    config.entities.fossil_fuel_percentage?.state_type === "percentage" ? "%" : unit;
   const displayZeroTolerance = config.entities.fossil_fuel_percentage?.display_zero_tolerance ?? 0;
 
   if (fossilEnergyConsumption) {
@@ -28,7 +31,7 @@ export const displayNonFossilState = (
       totalFromGrid
     );
 
-    if (unitOfMeasurement === "W") {
+    if (unitOfMeasurement === unit) {
       let value = nonFossilEnergy;
       if (displayZeroTolerance && value < displayZeroTolerance) value = 0;
       return displayValue(hass, config, value, {
@@ -45,7 +48,6 @@ export const displayNonFossilState = (
       watt_threshold: config.watt_threshold,
     });
   }
-
   if (!entityFossil || !isEntityAvailable(hass, entityFossil)) {
     unavailableOrMisconfiguredError(entityFossil);
     return "NaN";
@@ -58,7 +60,7 @@ export const displayNonFossilState = (
     gridConsumption = getEntityStateWatts(hass, config.entities.grid?.entity.consumption) || 0;
   }
 
-  if (unitOfMeasurement === "W") {
+  if (unitOfMeasurement === unit) {
     let nonFossilFuelWatts = gridConsumption * nonFossilFuelDecimal;
     if (displayZeroTolerance) {
       if (nonFossilFuelWatts < displayZeroTolerance) {

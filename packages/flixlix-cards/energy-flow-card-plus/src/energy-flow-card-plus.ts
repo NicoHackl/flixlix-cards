@@ -945,7 +945,6 @@ export class EnergyFlowCardPlus extends LitElement {
       battery.state.toGrid = 0;
       battery.state.toHome = 0;
     }
-    console.log(home);
     computeEnergyDistribution({
       entities: {
         grid: entities.grid,

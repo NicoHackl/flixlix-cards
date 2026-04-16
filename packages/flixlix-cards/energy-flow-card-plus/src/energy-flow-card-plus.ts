@@ -151,7 +151,7 @@ export class EnergyFlowCardPlus extends LitElement {
   setConfig(config: EnergyFlowCardPlusConfig): void {
     if ((config.entities as any).individual1 || (config.entities as any).individual2) {
       throw new Error(
-        "You are using an outdated configuration. Please update your configuration to the latest version."
+        "You are using an outdated configuration. Please update your configuration to the latest version. The individual1 and individual2 properties are now just a single individual array property. The easiest way to do this is to remove the individual1 and individual2 properties and replace them in the UI Editor."
       );
     }
     if (

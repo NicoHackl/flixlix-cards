@@ -45,15 +45,41 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Resolve released packages
+        id: released-packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          published='${{ steps.changesets.outputs.publishedPackages }}'
+          if [ -n "$published" ] && [ "$published" != "[]" ]; then
+            echo "packages=$published" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          files=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- 'packages/**/package.json')
+          if [ -z "$files" ]; then
+            echo "packages=[]" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          packages_json=$(printf '%s\n' "$files" | while read -r file; do
+            [ -z "$file" ] && continue
+            old=$(git show "${{ github.event.before }}:$file" 2>/dev/null | jq -r '.version // empty')
+            new=$(jq -r '.version // empty' "$file")
+            name=$(jq -r '.name // empty' "$file")
+            if [ -n "$old" ] && [ -n "$new" ] && [ "$old" != "$new" ] && [ -n "$name" ]; then
+              jq -nc --arg name "$name" --arg version "$new" '{name:$name,version:$version}'
+            fi
+          done | jq -sc '.')
+          echo "packages=${packages_json:-[]}" >> "$GITHUB_OUTPUT"
+
       # ============================================
       # DISTRIBUTION (Sync to Dist Repos)
       # ============================================
       - name: Sync Packages to Distribution Repos
-        if: steps.changesets.outputs.published == 'true'
+        if: steps.released-packages.outputs.packages != '[]'
         env:
           DIST_REPO_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
           GH_TOKEN: ${{ secrets.DIST_REPO_TOKEN }}
-          PUBLISHED_PACKAGES: ${{ steps.changesets.outputs.publishedPackages }}
+          PUBLISHED_PACKAGES: ${{ steps.released-packages.outputs.packages }}
         run: |
           set -euo pipefail
 

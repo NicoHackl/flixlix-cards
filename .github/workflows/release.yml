@@ -54,41 +54,57 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Helper to check if package should be published
+          is_publishable() {
+            local name="$1"
+            # Skip internal/tooling packages
+            [[ "$name" == @flixlix-cards/* ]] && return 1
+            return 0
+          }
+
           echo "::group::Debug Information"
           echo "github.event.before: ${{ github.event.before }}"
           echo "github.sha: ${{ github.sha }}"
           echo "changesets published output: '${{ steps.changesets.outputs.publishedPackages }}'"
           echo "::endgroup::"
 
-          # Method 1: Check changesets output
+          # Method 1: Check changesets output (filter internal packages)
           published='${{ steps.changesets.outputs.publishedPackages }}'
           if [ -n "$published" ] && [ "$published" != "[]" ]; then
-            echo "::notice::Using changesets publishedPackages output"
-            echo "packages=$published" >> "$GITHUB_OUTPUT"
-            exit 0
+            filtered=$(echo "$published" | jq -c '[.[] | select(.name | startswith("@flixlix-cards/") | not)]')
+            if [ "$filtered" != "[]" ]; then
+              echo "::notice::Using filtered changesets publishedPackages output"
+              echo "packages=$filtered" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
           fi
 
           echo "::group::Method 2 - Check for new tags"
-          # Method 2: Find packages with tags that don't exist on dist repos yet
           packages_json="[]"
 
           for pkg_json in packages/*/package.json packages/*/*/package.json; do
             [ -f "$pkg_json" ] || continue
-            
+
             name=$(jq -r '.name // empty' "$pkg_json")
             version=$(jq -r '.version // empty' "$pkg_json")
-            
+
             [ -z "$name" ] || [ -z "$version" ] && continue
-            
+
+            # Skip internal packages
+            if ! is_publishable "$name"; then
+              echo "Skipping internal package: $name"
+              continue
+            fi
+
             clean_name=$(echo "$name" | sed 's|^@.*/||')
             tag_name="v${version}"
-            
+
             echo "Checking $name@$version..."
-            
+
             # Check if this tag exists locally (created by changeset tag)
             if git tag -l "$name@$version" | grep -q .; then
               echo "  ✓ Found local tag: $name@$version"
-              
+
               # Check if tag exists on dist repo
               dist_repo_url="https://github.com/flixlix/${clean_name}.git"
               if git ls-remote --tags "$dist_repo_url" 2>/dev/null | grep -q "refs/tags/${tag_name}$"; then
@@ -104,37 +120,40 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::Method 3 - Fallback: Check git diff"
-          # Method 3: If still empty, check recent commits for version changes
           if [ "$packages_json" = "[]" ]; then
             echo "No tagged packages found, checking git history..."
-            
-            # Look at the last 5 commits for version changes
+
             for commit in $(git log --oneline -5 --format="%H"); do
               parent=$(git rev-parse "${commit}^" 2>/dev/null || echo "")
               [ -z "$parent" ] && continue
-              
+
               files=$(git diff --name-only "$parent" "$commit" -- 'packages/**/package.json' 2>/dev/null || true)
               [ -z "$files" ] && continue
-              
+
               echo "Checking commit $commit..."
-              
+
               while IFS= read -r file; do
                 [ -z "$file" ] && continue
                 [ -f "$file" ] || continue
-                
+
                 old_version=$(git show "${parent}:${file}" 2>/dev/null | jq -r '.version // empty' 2>/dev/null || echo "")
                 new_version=$(jq -r '.version // empty' "$file")
                 name=$(jq -r '.name // empty' "$file")
-                
+
+                # Skip internal packages
+                if ! is_publishable "$name"; then
+                  continue
+                fi
+
                 if [ -n "$old_version" ] && [ -n "$new_version" ] && [ "$old_version" != "$new_version" ] && [ -n "$name" ]; then
                   clean_name=$(echo "$name" | sed 's|^@.*/||')
                   tag_name="v${new_version}"
-                  
+
                   # Check if already in our list
                   if echo "$packages_json" | jq -e --arg n "$name" '.[] | select(.name == $n)' > /dev/null 2>&1; then
                     continue
                   fi
-                  
+
                   # Check if tag exists on dist repo
                   dist_repo_url="https://github.com/flixlix/${clean_name}.git"
                   if git ls-remote --tags "$dist_repo_url" 2>/dev/null | grep -q "refs/tags/${tag_name}$"; then
@@ -221,7 +240,7 @@ jobs:
             echo "Copying files..."
             cp -f "$BUILD_OUTPUT" "dist-repo/${CLEAN_NAME}.js"
             jq 'del(.dependencies, .devDependencies, .scripts, .packageManager, .main, .exports)' "${PKG_DIR}/package.json" > dist-repo/package.json
-            
+
             for file in hacs.json README.md CHANGELOG.md LICENSE; do
               [ -f "${PKG_DIR}/${file}" ] && cp -f "${PKG_DIR}/${file}" "dist-repo/${file}"
             done
@@ -253,7 +272,7 @@ jobs:
             fi
 
             git tag -a "$TAG_NAME" -m "Release ${TAG_NAME}"
-            
+
             if ! git push origin main --tags; then
               echo "::error::Failed to push"
               cd ..

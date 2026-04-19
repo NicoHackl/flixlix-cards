@@ -19,7 +19,9 @@ import {
 import {
   getBatteryInState,
   getBatteryOutState,
-  getBatteryStateOfCharge,
+  getSingleBatteryInState,
+  getSingleBatteryOutState,
+  getSingleBatteryStateOfCharge,
 } from "@flixlix-cards/shared/states/raw/battery";
 import {
   getGridConsumptionState,
@@ -81,14 +83,14 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import packageJson from "../package.json" with { type: "json" };
 
 registerCustomCard({
-  type: "power-flow-card-plus",
+  type: "power-flow-card-plus-extended",
   name: "Power Flow Card Plus",
   description:
     "An extended version of the power flow card with richer options, advanced features and a few small UI enhancements. Inspired by the Energy Dashboard.",
   version: packageJson.version,
 });
 
-@customElement("power-flow-card-plus")
+@customElement("power-flow-card-plus-extended")
 export class PowerFlowCardPlus extends LitElement {
   @property({ attribute: false }) public hass!: HomeAssistant;
   @state() private _config = {} as PowerFlowCardPlusConfig;
@@ -116,6 +118,7 @@ export class PowerFlowCardPlus extends LitElement {
         grid: GridObject;
         solar: any;
         battery: any;
+        batteryObjects: any[];
         home: any;
         nonFossil: any;
         individualObjs: IndividualObject[];
@@ -140,11 +143,24 @@ export class PowerFlowCardPlus extends LitElement {
         "You are using an outdated configuration. Please update your configuration to the latest version. The individual1 and individual2 properties are now just a single individual array property. The easiest way to do this is to remove the individual1 and individual2 properties and replace them in the UI Editor."
       );
     }
+    // Migrate old single-battery config object to array
+    if (
+      config.entities?.battery &&
+      !Array.isArray(config.entities.battery) &&
+      typeof config.entities.battery === "object"
+    ) {
+      config = {
+        ...config,
+        entities: {
+          ...config.entities,
+          battery: [config.entities.battery as any],
+        },
+      };
+    }
+    const hasBatteryEntity = (config.entities?.battery as any[])?.some((b: any) => b?.entity);
     if (
       !config.entities ||
-      (!config.entities?.battery?.entity &&
-        !config.entities?.grid?.entity &&
-        !config.entities?.solar?.entity)
+      (!hasBatteryEntity && !config.entities?.grid?.entity && !config.entities?.solar?.entity)
     ) {
       throw new Error("At least one entity for battery, grid or solar must be defined");
     }
@@ -189,7 +205,7 @@ export class PowerFlowCardPlus extends LitElement {
 
   public static async getConfigElement(): Promise<LovelaceCardEditor> {
     await import("./ui-editor/ui-editor");
-    return document.createElement("power-flow-card-plus-editor");
+    return document.createElement("power-flow-card-plus-extended-editor");
   }
 
   public static getStubConfig(hass: HomeAssistant): object {
@@ -362,6 +378,7 @@ export class PowerFlowCardPlus extends LitElement {
       grid,
       solar,
       battery,
+      batteryObjects,
       home,
       nonFossil,
       individualObjs,
@@ -398,7 +415,7 @@ export class PowerFlowCardPlus extends LitElement {
           class="card-content ${this._config.full_size ? "full-size" : ""} ${this._config.no_labels
             ? "no-labels"
             : ""}"
-          id="power-flow-card-plus"
+          id="power-flow-card-plus-extended"
           style=${this._config.style_card_content ? this._config.style_card_content : ""}
         >
           ${solar.has ||
@@ -471,7 +488,13 @@ export class PowerFlowCardPlus extends LitElement {
           ${battery.has || checkHasBottomIndividual(individualObjs)
             ? html`<div class="row">
                 ${spacer}
-                ${battery.has ? batteryElement(this, this._config, { battery, entities }) : spacer}
+                ${battery.has
+                  ? html`<div class="batteries-container">
+                      ${batteryObjects.map((b) =>
+                        batteryElement(this, this._config, { battery: b, batteryConfig: b._config })
+                      )}
+                    </div>`
+                  : spacer}
                 ${individualFieldLeftBottom
                   ? individualLeftBottomElement(this, this._config, {
                       displayState: getIndividualDisplayState(individualFieldLeftBottom),
@@ -509,7 +532,7 @@ export class PowerFlowCardPlus extends LitElement {
       return;
     }
 
-    const elem = this.shadowRoot?.querySelector("#power-flow-card-plus") as HTMLElement | null;
+    const elem = this.shadowRoot?.querySelector("#power-flow-card-plus-extended") as HTMLElement | null;
     if (elem) {
       if (!this._resizeObserver) {
         this._resizeObserver = new ResizeObserver((entries) => {
@@ -652,30 +675,92 @@ export class PowerFlowCardPlus extends LitElement {
         double_tap_action: entities.solar?.secondary_info?.double_tap_action,
       },
     };
-    const checkIfHasBattery = () => {
-      if (!entities.battery?.entity) return false;
-      if (typeof entities.battery?.entity === "object")
-        return entities.battery?.entity.consumption || entities.battery?.entity.production;
-      return entities.battery?.entity !== undefined;
+    const batteryConfigs = entities.battery ?? [];
+    const checkSingleBatteryHas = (batConfig: any) => {
+      if (!batConfig?.entity) return false;
+      if (typeof batConfig.entity === "object")
+        return !!(batConfig.entity.consumption || batConfig.entity.production);
+      return true;
     };
+    // Per-battery render objects (one per configured battery)
+    const batteryObjects = batteryConfigs
+      .map((batConfig) => {
+        if (!checkSingleBatteryHas(batConfig)) return null;
+        const socState = getSingleBatteryStateOfCharge(this.hass, batConfig);
+        let icon = computeFieldIcon(this.hass, batConfig, "mdi:battery-high");
+        if (socState === null) {
+          icon = "mdi:battery";
+        } else if (socState <= 72 && socState > 44) {
+          icon = "mdi:battery-medium";
+        } else if (socState <= 44 && socState > 16) {
+          icon = "mdi:battery-low";
+        } else if (socState <= 16) {
+          icon = "mdi:battery-outline";
+        }
+        if (batConfig.icon) icon = batConfig.icon;
+        if (batConfig.use_metadata) {
+          const metadataIcon = computeFieldIcon(this.hass, batConfig, "NO_ICON_METADATA");
+          if (metadataIcon !== "NO_ICON_METADATA") icon = metadataIcon;
+        }
+        const inState = getSingleBatteryInState(this.hass, batConfig);
+        const outState = getSingleBatteryOutState(this.hass, batConfig);
+        return {
+          _config: batConfig,
+          entity: batConfig.entity,
+          has: true,
+          mainEntity:
+            typeof batConfig.entity === "object" ? batConfig.entity.consumption : batConfig.entity,
+          name: computeFieldName(
+            this.hass,
+            batConfig,
+            this.hass.localize("ui.panel.lovelace.cards.energy.energy_distribution.battery")
+          ),
+          icon,
+          state_of_charge: {
+            state: socState,
+            unit: batConfig.state_of_charge_unit ?? "%",
+            unit_white_space: batConfig.state_of_charge_unit_white_space ?? true,
+            decimals: batConfig.state_of_charge_decimals ?? 0,
+          },
+          state: {
+            toBattery: inState,
+            fromBattery: outState,
+            toGrid: 0,
+            toHome: 0,
+          },
+          tap_action: batConfig.tap_action,
+          hold_action: batConfig.hold_action,
+          double_tap_action: batConfig.double_tap_action,
+          color: {
+            fromBattery: batConfig.color?.consumption,
+            toBattery: batConfig.color?.production,
+            icon_type: undefined as string | boolean | undefined,
+            circle_type: batConfig.color_circle,
+          },
+        };
+      })
+      .filter(Boolean) as NonNullable<(typeof batteryObjects)[number]>[];
+
+    // Aggregate battery object used for flows and power distribution
+    const firstBatConfig = batteryConfigs[0];
     const battery = {
-      entity: entities.battery?.entity,
-      has: checkIfHasBattery(),
+      entity: firstBatConfig?.entity,
+      has: batteryObjects.length > 0,
       mainEntity:
-        typeof entities.battery?.entity === "object"
-          ? entities.battery.entity.consumption
-          : entities.battery?.entity,
+        firstBatConfig && typeof firstBatConfig.entity === "object"
+          ? firstBatConfig.entity.consumption
+          : firstBatConfig?.entity,
       name: computeFieldName(
         this.hass,
-        entities.battery,
+        firstBatConfig,
         this.hass.localize("ui.panel.lovelace.cards.energy.energy_distribution.battery")
       ),
-      icon: computeFieldIcon(this.hass, entities.battery, "mdi:battery-high"),
+      icon: batteryObjects[0]?.icon ?? "mdi:battery-high",
       state_of_charge: {
-        state: getBatteryStateOfCharge(this.hass, this._config),
-        unit: entities?.battery?.state_of_charge_unit ?? "%",
-        unit_white_space: entities?.battery?.state_of_charge_unit_white_space ?? true,
-        decimals: entities?.battery?.state_of_charge_decimals || 0,
+        state: batteryObjects[0]?.state_of_charge.state ?? null,
+        unit: firstBatConfig?.state_of_charge_unit ?? "%",
+        unit_white_space: firstBatConfig?.state_of_charge_unit_white_space ?? true,
+        decimals: firstBatConfig?.state_of_charge_decimals ?? 0,
       },
       state: {
         toBattery: getBatteryInState(this.hass, this._config),
@@ -683,14 +768,14 @@ export class PowerFlowCardPlus extends LitElement {
         toGrid: 0,
         toHome: 0,
       },
-      tap_action: entities.battery?.tap_action,
-      hold_action: entities.battery?.hold_action,
-      double_tap_action: entities.battery?.double_tap_action,
+      tap_action: firstBatConfig?.tap_action,
+      hold_action: firstBatConfig?.hold_action,
+      double_tap_action: firstBatConfig?.double_tap_action,
       color: {
-        fromBattery: entities.battery?.color?.consumption,
-        toBattery: entities.battery?.color?.production,
+        fromBattery: firstBatConfig?.color?.consumption,
+        toBattery: firstBatConfig?.color?.production,
         icon_type: undefined as string | boolean | undefined,
-        circle_type: entities.battery?.color_circle,
+        circle_type: firstBatConfig?.color_circle,
       },
     };
     const home = {
@@ -769,14 +854,8 @@ export class PowerFlowCardPlus extends LitElement {
       solar.state.total,
       entities.solar?.display_zero_tolerance
     );
-    battery.state.fromBattery = adjustZeroTolerance(
-      battery.state.fromBattery,
-      entities.battery?.display_zero_tolerance
-    );
-    battery.state.toBattery = adjustZeroTolerance(
-      battery.state.toBattery,
-      entities.battery?.display_zero_tolerance
-    );
+    // Per-battery tolerance is already applied inside getSingleBatteryInState/OutState.
+    // No additional aggregate-level adjustment needed here.
     if (grid.state.fromGrid === 0) {
       grid.state.toHome = 0;
       grid.state.toBattery = 0;
@@ -790,10 +869,13 @@ export class PowerFlowCardPlus extends LitElement {
       battery.state.toGrid = 0;
       battery.state.toHome = 0;
     }
+    const maxBatteryTolerance = Math.max(
+      ...(batteryConfigs.map((b) => b.display_zero_tolerance ?? 0))
+    );
     computePowerDistributionAfterSolarAndBattery({
       entities: {
         grid: entities.grid,
-        battery: entities.battery,
+        battery: { display_zero_tolerance: maxBatteryTolerance },
         solar: entities.solar,
         fossil_fuel_percentage: entities.fossil_fuel_percentage,
       },
@@ -873,23 +955,6 @@ export class PowerFlowCardPlus extends LitElement {
       (battery.state.toHome ?? 0) +
       (grid.state.toBattery ?? 0) +
       (battery.state.toGrid ?? 0);
-    if (battery.state_of_charge.state === null) {
-      battery.icon = "mdi:battery";
-    } else if (battery.state_of_charge.state <= 72 && battery.state_of_charge.state > 44) {
-      battery.icon = "mdi:battery-medium";
-    } else if (battery.state_of_charge.state <= 44 && battery.state_of_charge.state > 16) {
-      battery.icon = "mdi:battery-low";
-    } else if (battery.state_of_charge.state <= 16) {
-      battery.icon = "mdi:battery-outline";
-    }
-    if (entities.battery?.icon !== undefined) battery.icon = entities.battery?.icon;
-    const batteryUseMetadataIcon = entities.battery?.use_metadata;
-    if (batteryUseMetadataIcon) {
-      const metadataIcon = computeFieldIcon(this.hass, entities.battery, "NO_ICON_METADATA");
-      if (metadataIcon !== "NO_ICON_METADATA") {
-        battery.icon = metadataIcon;
-      }
-    }
     const newDur: NewDur = {
       batteryGrid: computeFlowRate(
         this._config,
@@ -1025,6 +1090,7 @@ export class PowerFlowCardPlus extends LitElement {
       grid,
       solar,
       battery,
+      batteryObjects,
       home,
       nonFossil,
       individualObjs: visibleIndividualObjects,

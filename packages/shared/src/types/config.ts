@@ -54,7 +54,7 @@ export interface EnergyFlowCardPlusConfig extends LovelaceCardConfig, mainConfig
 
 export type IndividualField = IndividualDeviceType[];
 
-interface Battery extends BaseConfigEntity {
+export interface Battery extends BaseConfigEntity {
   state_of_charge?: string;
   state_of_charge_unit?: string;
   state_of_charge_unit_white_space?: boolean;
@@ -114,7 +114,7 @@ interface FossilFuelPercentage extends BaseConfigEntity {
 }
 
 export type ConfigEntities = {
-  battery?: Battery;
+  battery?: Battery[];
   grid?: Grid;
   solar?: Solar;
   home?: Home;

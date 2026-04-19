@@ -9,6 +9,7 @@ import { fireEvent, type HomeAssistant, type LovelaceCardEditor } from "custom-c
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { assert } from "superstruct";
+import "./components/batteries-editor";
 import "./components/individual-devices-editor";
 import "./components/link-subpage";
 import "./components/subpage-header";
@@ -61,7 +62,7 @@ const CONFIG_PAGES: {
   },
 ];
 
-@customElement("power-flow-card-plus-editor")
+@customElement("power-flow-card-plus-extended-editor")
 export class PowerFlowCardPlusEditor extends LitElement implements LovelaceCardEditor {
   @property({ attribute: false }) public hass!: HomeAssistant;
   @state() private _config?: PowerFlowCardPlusConfig;
@@ -112,6 +113,18 @@ export class PowerFlowCardPlusEditor extends LitElement implements LovelaceCardE
             .config=${this._config}
             @config-changed=${this._valueChanged}
           ></individual-devices-editor>
+        `;
+      }
+
+      if (this._currentConfigPage === "battery") {
+        return html`
+          <subpage-header @go-back=${this._goBack} page=${this._currentConfigPage}>
+          </subpage-header>
+          <batteries-editor
+            .hass=${this.hass}
+            .config=${this._config}
+            @config-changed=${this._valueChanged}
+          ></batteries-editor>
         `;
       }
 
@@ -186,7 +199,8 @@ export class PowerFlowCardPlusEditor extends LitElement implements LovelaceCardE
     if (
       this._currentConfigPage !== null &&
       this._currentConfigPage !== "advanced" &&
-      this._currentConfigPage !== "individual"
+      this._currentConfigPage !== "individual" &&
+      this._currentConfigPage !== "battery"
     ) {
       config = {
         ...this._config,
@@ -250,6 +264,6 @@ export class PowerFlowCardPlusEditor extends LitElement implements LovelaceCardE
 
 declare global {
   interface HTMLElementTagNameMap {
-    "power-flow-card-plus-editor": PowerFlowCardPlusEditor;
+    "power-flow-card-plus-extended-editor": PowerFlowCardPlusEditor;
   }
 }

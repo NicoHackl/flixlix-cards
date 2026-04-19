@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(k\\) for k in d.get\\('exports',{}\\).keys\\(\\)]\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); e=d.get\\('exports',{}\\); print\\(json.dumps\\({k:v for k,v in e.items\\(\\) if 'states' in k or 'tolerance' in k}, indent=2\\)\\)\")"
+    ]
+  }
+}

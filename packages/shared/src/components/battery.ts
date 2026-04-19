@@ -1,6 +1,6 @@
 import {
+  type Battery,
   type CardMainContext,
-  type ConfigEntities,
   type FlowCardPlusConfig,
 } from "@flixlix-cards/shared/types";
 import { displayValue } from "@flixlix-cards/shared/utils/display-value";
@@ -11,79 +11,47 @@ export const batteryElement = (
   config: FlowCardPlusConfig,
   {
     battery,
-    entities,
+    batteryConfig,
   }: {
     battery: any;
-    entities: ConfigEntities;
+    batteryConfig: Battery;
   }
 ) => {
   const disableEntityClick = config.clickable_entities === false;
+
+  const getClickTarget = () =>
+    batteryConfig?.state_of_charge
+      ? batteryConfig.state_of_charge
+      : typeof batteryConfig?.entity === "string"
+        ? batteryConfig.entity
+        : (batteryConfig?.entity as any)?.production;
+
   return html`<div class="circle-container battery">
     <div
       class="circle ${disableEntityClick ? "pointer-events-none" : ""}"
-      @click=${(e: MouseEvent) => {
-        const target = entities.battery?.state_of_charge
-          ? entities.battery?.state_of_charge
-          : typeof entities.battery?.entity === "string"
-            ? entities.battery?.entity
-            : entities.battery?.entity.production;
-        main.onEntityClick(e, battery, target);
-      }}
-      @dblclick=${(e: MouseEvent) => {
-        const target = entities.battery?.state_of_charge
-          ? entities.battery?.state_of_charge
-          : typeof entities.battery?.entity === "string"
-            ? entities.battery?.entity
-            : entities.battery?.entity.production;
-        main.onEntityDoubleClick(e, battery, target);
-      }}
-      @pointerdown=${(e: PointerEvent) => {
-        const target = entities.battery?.state_of_charge
-          ? entities.battery?.state_of_charge
-          : typeof entities.battery?.entity === "string"
-            ? entities.battery?.entity
-            : entities.battery?.entity.production;
-        main.onEntityPointerDown(e, battery, target);
-      }}
-      @pointerup=${(e: PointerEvent) => {
-        main.onEntityPointerUp(e);
-      }}
-      @pointercancel=${(e: PointerEvent) => {
-        main.onEntityPointerUp(e);
-      }}
+      @click=${(e: MouseEvent) => main.onEntityClick(e, battery, getClickTarget())}
+      @dblclick=${(e: MouseEvent) => main.onEntityDoubleClick(e, battery, getClickTarget())}
+      @pointerdown=${(e: PointerEvent) => main.onEntityPointerDown(e, battery, getClickTarget())}
+      @pointerup=${(e: PointerEvent) => main.onEntityPointerUp(e)}
+      @pointercancel=${(e: PointerEvent) => main.onEntityPointerUp(e)}
       @keyDown=${(e: { key: string; stopPropagation: () => void; target: HTMLElement }) => {
-        if (e.key === "Enter") {
-          const target = entities.battery?.state_of_charge
-            ? entities.battery?.state_of_charge
-            : typeof entities.battery?.entity === "string"
-              ? entities.battery.entity
-              : entities.battery?.entity.production;
-          main.openDetails(e, battery, target, "tap");
-        }
+        if (e.key === "Enter") main.openDetails(e, battery, getClickTarget(), "tap");
       }}
     >
       <ha-ripple .disabled=${disableEntityClick}></ha-ripple>
-      ${battery.state_of_charge.state !== null && entities.battery?.show_state_of_charge !== false
+      ${battery.state_of_charge.state !== null && batteryConfig?.show_state_of_charge !== false
         ? html` <span
-            @click=${(e: MouseEvent) => {
-              main.onEntityClick(e, battery, entities.battery?.state_of_charge);
-            }}
-            @dblclick=${(e: MouseEvent) => {
-              main.onEntityDoubleClick(e, battery, entities.battery?.state_of_charge);
-            }}
-            @pointerdown=${(e: PointerEvent) => {
-              main.onEntityPointerDown(e, battery, entities.battery?.state_of_charge);
-            }}
-            @pointerup=${(e: PointerEvent) => {
-              main.onEntityPointerUp(e);
-            }}
-            @pointercancel=${(e: PointerEvent) => {
-              main.onEntityPointerUp(e);
-            }}
+            @click=${(e: MouseEvent) =>
+              main.onEntityClick(e, battery, batteryConfig?.state_of_charge)}
+            @dblclick=${(e: MouseEvent) =>
+              main.onEntityDoubleClick(e, battery, batteryConfig?.state_of_charge)}
+            @pointerdown=${(e: PointerEvent) =>
+              main.onEntityPointerDown(e, battery, batteryConfig?.state_of_charge)}
+            @pointerup=${(e: PointerEvent) => main.onEntityPointerUp(e)}
+            @pointercancel=${(e: PointerEvent) => main.onEntityPointerUp(e)}
             @keyDown=${(e: { key: string; stopPropagation: () => void; target: HTMLElement }) => {
-              if (e.key === "Enter") {
-                main.openDetails(e, battery, entities.battery?.state_of_charge, "tap");
-              }
+              if (e.key === "Enter")
+                main.openDetails(e, battery, batteryConfig?.state_of_charge, "tap");
             }}
             id="battery-state-of-charge-text"
           >
@@ -100,70 +68,56 @@ export const batteryElement = (
         ? html` <ha-icon
             id="battery-icon"
             .icon=${battery.icon}
-            @click=${(e: MouseEvent) => {
-              main.onEntityClick(e, battery, entities.battery?.state_of_charge);
-            }}
-            @dblclick=${(e: MouseEvent) => {
-              main.onEntityDoubleClick(e, battery, entities.battery?.state_of_charge);
-            }}
-            @pointerdown=${(e: PointerEvent) => {
-              main.onEntityPointerDown(e, battery, entities.battery?.state_of_charge);
-            }}
-            @pointerup=${(e: PointerEvent) => {
-              main.onEntityPointerUp(e);
-            }}
-            @pointercancel=${(e: PointerEvent) => {
-              main.onEntityPointerUp(e);
-            }}
+            @click=${(e: MouseEvent) =>
+              main.onEntityClick(e, battery, batteryConfig?.state_of_charge)}
+            @dblclick=${(e: MouseEvent) =>
+              main.onEntityDoubleClick(e, battery, batteryConfig?.state_of_charge)}
+            @pointerdown=${(e: PointerEvent) =>
+              main.onEntityPointerDown(e, battery, batteryConfig?.state_of_charge)}
+            @pointerup=${(e: PointerEvent) => main.onEntityPointerUp(e)}
+            @pointercancel=${(e: PointerEvent) => main.onEntityPointerUp(e)}
             @keyDown=${(e: { key: string; stopPropagation: () => void; target: HTMLElement }) => {
-              if (e.key === "Enter") {
-                main.openDetails(e, battery, entities.battery?.state_of_charge, "tap");
-              }
+              if (e.key === "Enter")
+                main.openDetails(e, battery, batteryConfig?.state_of_charge, "tap");
             }}
           ></ha-icon>`
         : nothing}
-      ${entities.battery?.display_state === "two_way" ||
-      entities.battery?.display_state === undefined ||
-      (entities.battery?.display_state === "one_way_no_zero" && battery.state.toBattery > 0) ||
-      (entities.battery?.display_state === "one_way" && battery.state.toBattery !== 0)
+      ${batteryConfig?.display_state === "two_way" ||
+      batteryConfig?.display_state === undefined ||
+      (batteryConfig?.display_state === "one_way_no_zero" && battery.state.toBattery > 0) ||
+      (batteryConfig?.display_state === "one_way" && battery.state.toBattery !== 0)
         ? html`<span
             class="battery-in"
             @click=${(e: MouseEvent) => {
               const target =
-                typeof entities.battery!.entity === "string"
-                  ? entities.battery!.entity!
-                  : entities.battery!.entity!.production!;
-
-              main.onEntityClick(e, entities.battery, target);
+                typeof batteryConfig!.entity === "string"
+                  ? batteryConfig!.entity!
+                  : (batteryConfig!.entity as any)!.production!;
+              main.onEntityClick(e, batteryConfig, target);
             }}
             @dblclick=${(e: MouseEvent) => {
               const target =
-                typeof entities.battery!.entity === "string"
-                  ? entities.battery!.entity!
-                  : entities.battery!.entity!.production!;
-              main.onEntityDoubleClick(e, entities.battery, target);
+                typeof batteryConfig!.entity === "string"
+                  ? batteryConfig!.entity!
+                  : (batteryConfig!.entity as any)!.production!;
+              main.onEntityDoubleClick(e, batteryConfig, target);
             }}
             @pointerdown=${(e: PointerEvent) => {
               const target =
-                typeof entities.battery!.entity === "string"
-                  ? entities.battery!.entity!
-                  : entities.battery!.entity!.production!;
-              main.onEntityPointerDown(e, entities.battery, target);
+                typeof batteryConfig!.entity === "string"
+                  ? batteryConfig!.entity!
+                  : (batteryConfig!.entity as any)!.production!;
+              main.onEntityPointerDown(e, batteryConfig, target);
             }}
-            @pointerup=${(e: PointerEvent) => {
-              main.onEntityPointerUp(e);
-            }}
-            @pointercancel=${(e: PointerEvent) => {
-              main.onEntityPointerUp(e);
-            }}
+            @pointerup=${(e: PointerEvent) => main.onEntityPointerUp(e)}
+            @pointercancel=${(e: PointerEvent) => main.onEntityPointerUp(e)}
             @keyDown=${(e: { key: string; stopPropagation: () => void; target: HTMLElement }) => {
               if (e.key === "Enter") {
                 const target =
-                  typeof entities.battery!.entity === "string"
-                    ? entities.battery!.entity!
-                    : entities.battery!.entity!.production!;
-
-                main.openDetails(e, entities.battery, target, "tap");
+                  typeof batteryConfig!.entity === "string"
+                    ? batteryConfig!.entity!
+                    : (batteryConfig!.entity as any)!.production!;
+                main.openDetails(e, batteryConfig, target, "tap");
               }
             }}
           >
@@ -176,49 +130,43 @@ export const batteryElement = (
             })}</span
           >`
         : nothing}
-      ${entities.battery?.display_state === "two_way" ||
-      entities.battery?.display_state === undefined ||
-      (entities.battery?.display_state === "one_way_no_zero" && battery.state.fromBattery > 0) ||
-      (entities.battery?.display_state === "one_way" &&
+      ${batteryConfig?.display_state === "two_way" ||
+      batteryConfig?.display_state === undefined ||
+      (batteryConfig?.display_state === "one_way_no_zero" && battery.state.fromBattery > 0) ||
+      (batteryConfig?.display_state === "one_way" &&
         (battery.state.toBattery === 0 || battery.state.fromBattery !== 0))
         ? html`<span
             class="battery-out"
             @click=${(e: MouseEvent) => {
               const target =
-                typeof entities.battery!.entity === "string"
-                  ? entities.battery!.entity!
-                  : entities.battery!.entity!.consumption!;
-
-              main.onEntityClick(e, entities.battery, target);
+                typeof batteryConfig!.entity === "string"
+                  ? batteryConfig!.entity!
+                  : (batteryConfig!.entity as any)!.consumption!;
+              main.onEntityClick(e, batteryConfig, target);
             }}
             @dblclick=${(e: MouseEvent) => {
               const target =
-                typeof entities.battery!.entity === "string"
-                  ? entities.battery!.entity!
-                  : entities.battery!.entity!.consumption!;
-              main.onEntityDoubleClick(e, entities.battery, target);
+                typeof batteryConfig!.entity === "string"
+                  ? batteryConfig!.entity!
+                  : (batteryConfig!.entity as any)!.consumption!;
+              main.onEntityDoubleClick(e, batteryConfig, target);
             }}
             @pointerdown=${(e: PointerEvent) => {
               const target =
-                typeof entities.battery!.entity === "string"
-                  ? entities.battery!.entity!
-                  : entities.battery!.entity!.consumption!;
-              main.onEntityPointerDown(e, entities.battery, target);
+                typeof batteryConfig!.entity === "string"
+                  ? batteryConfig!.entity!
+                  : (batteryConfig!.entity as any)!.consumption!;
+              main.onEntityPointerDown(e, batteryConfig, target);
             }}
-            @pointerup=${(e: PointerEvent) => {
-              main.onEntityPointerUp(e);
-            }}
-            @pointercancel=${(e: PointerEvent) => {
-              main.onEntityPointerUp(e);
-            }}
+            @pointerup=${(e: PointerEvent) => main.onEntityPointerUp(e)}
+            @pointercancel=${(e: PointerEvent) => main.onEntityPointerUp(e)}
             @keyDown=${(e: { key: string; stopPropagation: () => void; target: HTMLElement }) => {
               if (e.key === "Enter") {
                 const target =
-                  typeof entities.battery!.entity === "string"
-                    ? entities.battery!.entity!
-                    : entities.battery!.entity!.consumption!;
-
-                main.openDetails(e, entities.battery, target, "tap");
+                  typeof batteryConfig!.entity === "string"
+                    ? batteryConfig!.entity!
+                    : (batteryConfig!.entity as any)!.consumption!;
+                main.openDetails(e, batteryConfig, target, "tap");
               }
             }}
           >

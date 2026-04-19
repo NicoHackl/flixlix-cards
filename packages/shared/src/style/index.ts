@@ -206,6 +206,14 @@ export const styles = css`
     height: 110px;
     justify-content: flex-end;
   }
+  .batteries-container {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
   .spacer {
     width: var(--size-circle-entity);
   }

@@ -154,11 +154,24 @@ export class EnergyFlowCardPlus extends LitElement {
         "You are using an outdated configuration. Please update your configuration to the latest version. The individual1 and individual2 properties are now just a single individual array property. The easiest way to do this is to remove the individual1 and individual2 properties and replace them in the UI Editor."
       );
     }
+    // Migrate old single-battery config object to array
+    if (
+      config.entities?.battery &&
+      !Array.isArray(config.entities.battery) &&
+      typeof config.entities.battery === "object"
+    ) {
+      config = {
+        ...config,
+        entities: {
+          ...config.entities,
+          battery: [config.entities.battery as any],
+        },
+      };
+    }
+    const hasBatteryEntity = (config.entities?.battery as any[])?.some((b: any) => b?.entity);
     if (
       !config.entities ||
-      (!config.entities?.battery?.entity &&
-        !config.entities?.grid?.entity &&
-        !config.entities?.solar?.entity)
+      (!hasBatteryEntity && !config.entities?.grid?.entity && !config.entities?.solar?.entity)
     ) {
       throw new Error("At least one entity for battery, grid or solar must be defined");
     }
@@ -239,12 +252,14 @@ export class EnergyFlowCardPlus extends LitElement {
       pushEntity(entities.grid?.entity?.consumption);
       pushEntity(entities.grid?.entity?.production);
     }
-    if (typeof entities.battery?.entity === "string") {
-      pushEntity(entities.battery.entity);
-    } else {
-      pushEntity(entities.battery?.entity?.consumption);
-      pushEntity(entities.battery?.entity?.production);
-    }
+    (entities.battery ?? []).forEach((bat) => {
+      if (typeof bat?.entity === "string") {
+        pushEntity(bat.entity);
+      } else {
+        pushEntity((bat?.entity as any)?.consumption);
+        pushEntity((bat?.entity as any)?.production);
+      }
+    });
     pushEntity(entities.solar?.entity as string | undefined);
     pushEntity(entities.home?.entity);
     pushEntity(entities.fossil_fuel_percentage?.entity);
@@ -614,7 +629,12 @@ export class EnergyFlowCardPlus extends LitElement {
           ${battery.has || checkHasBottomIndividual(individualObjs)
             ? html`<div class="row">
                 ${spacer}
-                ${battery.has ? batteryElement(this, this._config, { battery, entities }) : spacer}
+                ${battery.has
+                  ? batteryElement(this, this._config, {
+                      battery,
+                      batteryConfig: (entities.battery ?? [])[0],
+                    })
+                  : spacer}
                 ${individualFieldLeftBottom
                   ? individualLeftBottomElement(this, this._config, {
                       displayState: getIndividualDisplayState(
@@ -826,51 +846,53 @@ export class EnergyFlowCardPlus extends LitElement {
         double_tap_action: entities.solar?.secondary_info?.double_tap_action,
       },
     };
+    // Energy card uses only the first configured battery
+    const firstBat = (entities.battery ?? [])[0];
     const checkIfHasBattery = () => {
-      if (!entities.battery?.entity) return false;
-      if (typeof entities.battery?.entity === "object")
-        return entities.battery?.entity.consumption || entities.battery?.entity.production;
-      return entities.battery?.entity !== undefined;
+      if (!firstBat?.entity) return false;
+      if (typeof firstBat.entity === "object")
+        return (firstBat.entity as any).consumption || (firstBat.entity as any).production;
+      return firstBat.entity !== undefined;
     };
     const battery = {
-      entity: entities.battery?.entity,
+      entity: firstBat?.entity,
       has: checkIfHasBattery(),
       mainEntity:
-        typeof entities.battery?.entity === "object"
-          ? entities.battery.entity.consumption
-          : entities.battery?.entity,
+        firstBat && typeof firstBat.entity === "object"
+          ? (firstBat.entity as any).consumption
+          : firstBat?.entity,
       name: computeFieldName(
         this.hass,
-        entities.battery,
+        firstBat,
         this.hass.localize("ui.panel.lovelace.cards.energy.energy_distribution.battery")
       ),
-      icon: computeFieldIcon(this.hass, entities.battery, "mdi:battery-high"),
+      icon: computeFieldIcon(this.hass, firstBat, "mdi:battery-high"),
       state_of_charge: {
         state: getBatteryStateOfCharge(this.hass, this._config),
-        unit: entities?.battery?.state_of_charge_unit ?? "%",
-        unit_white_space: entities?.battery?.state_of_charge_unit_white_space ?? true,
-        decimals: entities?.battery?.state_of_charge_decimals || 0,
+        unit: firstBat?.state_of_charge_unit ?? "%",
+        unit_white_space: firstBat?.state_of_charge_unit_white_space ?? true,
+        decimals: firstBat?.state_of_charge_decimals ?? 0,
       },
       state: {
         toBattery:
-          typeof entities.battery?.entity === "string"
+          firstBat && typeof firstBat.entity === "string"
             ? 0
-            : getEnergyEntityState(entities.battery?.entity?.consumption),
+            : getEnergyEntityState((firstBat?.entity as any)?.consumption),
         fromBattery:
-          typeof entities.battery?.entity === "string"
-            ? getEnergyEntityState(entities.battery.entity)
-            : getEnergyEntityState(entities.battery?.entity?.production),
+          firstBat && typeof firstBat.entity === "string"
+            ? getEnergyEntityState(firstBat.entity)
+            : getEnergyEntityState((firstBat?.entity as any)?.production),
         toGrid: 0,
         toHome: 0,
       },
-      tap_action: entities.battery?.tap_action,
-      hold_action: entities.battery?.hold_action,
-      double_tap_action: entities.battery?.double_tap_action,
+      tap_action: firstBat?.tap_action,
+      hold_action: firstBat?.hold_action,
+      double_tap_action: firstBat?.double_tap_action,
       color: {
-        fromBattery: entities.battery?.color?.consumption,
-        toBattery: entities.battery?.color?.production,
+        fromBattery: firstBat?.color?.consumption,
+        toBattery: firstBat?.color?.production,
         icon_type: undefined as string | boolean | undefined,
-        circle_type: entities.battery?.color_circle,
+        circle_type: firstBat?.color_circle,
       },
     };
     const home = {
@@ -956,11 +978,11 @@ export class EnergyFlowCardPlus extends LitElement {
     );
     battery.state.fromBattery = adjustZeroTolerance(
       battery.state.fromBattery,
-      entities.battery?.display_zero_tolerance
+      firstBat?.display_zero_tolerance
     );
     battery.state.toBattery = adjustZeroTolerance(
       battery.state.toBattery,
-      entities.battery?.display_zero_tolerance
+      firstBat?.display_zero_tolerance
     );
     if (grid.state.fromGrid === 0) {
       grid.state.toHome = 0;
@@ -978,7 +1000,7 @@ export class EnergyFlowCardPlus extends LitElement {
     computeEnergyDistribution({
       entities: {
         grid: entities.grid,
-        battery: entities.battery,
+        battery: { display_zero_tolerance: firstBat?.display_zero_tolerance },
         solar: entities.solar,
         fossil_fuel_percentage: entities.fossil_fuel_percentage,
       },
@@ -1063,13 +1085,10 @@ export class EnergyFlowCardPlus extends LitElement {
     } else if (battery.state_of_charge.state <= 16) {
       battery.icon = "mdi:battery-outline";
     }
-    if (entities.battery?.icon !== undefined) battery.icon = entities.battery?.icon;
-    const batteryUseMetadataIcon = entities.battery?.use_metadata;
-    if (batteryUseMetadataIcon) {
-      const metadataIcon = computeFieldIcon(this.hass, entities.battery, "NO_ICON_METADATA");
-      if (metadataIcon !== "NO_ICON_METADATA") {
-        battery.icon = metadataIcon;
-      }
+    if (firstBat?.icon !== undefined) battery.icon = firstBat.icon;
+    if (firstBat?.use_metadata) {
+      const metadataIcon = computeFieldIcon(this.hass, firstBat, "NO_ICON_METADATA");
+      if (metadataIcon !== "NO_ICON_METADATA") battery.icon = metadataIcon;
     }
     const newDur: NewDur = {
       batteryGrid: computeFlowRate(

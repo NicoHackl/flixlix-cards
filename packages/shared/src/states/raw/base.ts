@@ -6,7 +6,8 @@ import { type FlowCardPlusConfig } from "@flixlix-cards/shared/types";
 import { isNumberValue } from "@flixlix-cards/shared/utils/utils";
 import { type HomeAssistant } from "custom-card-helpers";
 
-type BaseEntityField = Exclude<keyof FlowCardPlusConfig["entities"], "individual">;
+// "battery" is excluded because it is now a Battery[] array and handled separately.
+type BaseEntityField = Exclude<keyof FlowCardPlusConfig["entities"], "individual" | "battery">;
 
 export const getSecondaryState = (
   hass: HomeAssistant,

@@ -1,0 +1,40 @@
+name: HACS Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build power-flow-card-plus-extended
+        run: pnpm --filter power-flow-card-plus build
+
+      - name: Copy JS to repo root for HACS
+        run: cp packages/flixlix-cards/power-flow-card-plus/dist/power-flow-card-plus.js power-flow-card-plus.js
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: power-flow-card-plus.js
+          generate_release_notes: true
